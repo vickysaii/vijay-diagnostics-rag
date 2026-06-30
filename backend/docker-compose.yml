@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: vijay_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vijay_user
+      POSTGRES_PASSWORD: vijay_pass
+      POSTGRES_DB: vijay_diagnostics
+    ports:
+      - "5432:5432"
+    volumes:
+      - vijay_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vijay_user -d vijay_diagnostics"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  vijay_pg_data:
