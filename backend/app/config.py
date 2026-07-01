@@ -5,7 +5,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://vijay_user:vijay_pass@localhost:5432/vijay_diagnostics"
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    HF_API_TOKEN: str = ""
     # Cosine distance threshold above which a retrieved chunk is considered
     # "not actually relevant" and gets filtered out (0 = identical meaning,
     # higher = less related). Tune this based on real queries - if relevant
