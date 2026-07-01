@@ -1,14 +1,32 @@
+import os
+
 import requests
 import streamlit as st
-
-# --- Config ---
-API_BASE_URL = "http://127.0.0.1:8000"  # change this when deploying (Phase 6)
 
 st.set_page_config(
     page_title="Vijay Diagnostics — Chat Assistant",
     page_icon="🩺",
     layout="centered",
 )
+
+# --- Config ---
+# Locally: defaults to your local backend.
+# On Streamlit Community Cloud: set API_BASE_URL in the app's Secrets
+# (Settings -> Secrets) to your EC2 backend's public address, e.g.
+# "http://ec2-XX-XX-XX-XX.compute-1.amazonaws.com:8000"
+def _get_api_base_url() -> str:
+    try:
+        if "API_BASE_URL" in st.secrets:
+            return st.secrets["API_BASE_URL"]
+    except Exception:
+        pass  # no secrets.toml present (normal for local dev) - fall through
+    return os.environ.get("API_BASE_URL", "http://127.0.0.1:8000")
+
+
+API_BASE_URL = _get_api_base_url()
+
+# Temporary debug - remove after confirming deployment works
+st.sidebar.caption(f"🔗 API: {API_BASE_URL}")
 
 # --- Theme: clinical teal/blue, clean and trustworthy ---
 PRIMARY = "#0E7C7B"      # deep teal
@@ -81,6 +99,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+def wake_backend():
+    """Silently ping the backend on app load to warm it up before the user sends a message."""
+    try:
+        requests.get(f"{API_BASE_URL}/health", timeout=60)
+    except Exception:
+        pass  # Silent - don't show an error before the user does anything
+
+
+# Warm up the backend silently on every page load
+wake_backend()
+
 # --- Session state ---
 if "session_id" not in st.session_state:
     st.session_state.session_id = None
@@ -95,7 +124,7 @@ def call_chat_api(message: str):
         payload["session_id"] = st.session_state.session_id
 
     try:
-        resp = requests.post(f"{API_BASE_URL}/chat", json=payload, timeout=30)
+        resp = requests.post(f"{API_BASE_URL}/chat", json=payload, timeout=60)
     except requests.exceptions.ConnectionError:
         return (
             "⚠️ I can't reach the server right now. Please make sure the backend "
