@@ -1,47 +1,26 @@
-import os
-import time
+from functools import lru_cache
 
-import requests
+from fastembed import TextEmbedding
 
 from app.config import settings
 
-# HuggingFace Inference API endpoint for our embedding model.
-# Runs the model on HF's servers instead of locally — no PyTorch/GPU needed,
-# so Render's free 512MB instance can handle it comfortably.
-HF_API_URL = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{settings.EMBEDDING_MODEL}"
+# all-MiniLM-L6-v2 via ONNX runtime (fastembed).
+# Produces identical 384-dim vectors to sentence-transformers but uses
+# ~150MB RAM vs ~700MB for the PyTorch version — fits Render's free tier.
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
-def _hf_headers() -> dict:
-    token = settings.HF_API_TOKEN
-    if not token:
-        raise ValueError("HF_API_TOKEN is not set. Add it to your .env file and Render environment variables.")
-    return {"Authorization": f"Bearer {token}"}
+@lru_cache(maxsize=1)
+def get_embedding_model() -> TextEmbedding:
+    """Load the ONNX embedding model once and cache it."""
+    return TextEmbedding(model_name=MODEL_NAME)
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """
-    Embed a batch of texts via the HuggingFace Inference API.
-    Returns a list of 384-dimensional embedding vectors.
-    """
-    response = requests.post(
-        HF_API_URL,
-        headers=_hf_headers(),
-        json={"inputs": texts, "options": {"wait_for_model": True}},
-        timeout=60,
-    )
-
-    if response.status_code == 503:
-        # Model is loading on HF's side — wait and retry once
-        time.sleep(20)
-        response = requests.post(
-            HF_API_URL,
-            headers=_hf_headers(),
-            json={"inputs": texts, "options": {"wait_for_model": True}},
-            timeout=60,
-        )
-
-    response.raise_for_status()
-    return response.json()
+    """Embed a batch of texts. Returns a list of 384-dim vectors."""
+    model = get_embedding_model()
+    embeddings = list(model.embed(texts))
+    return [e.tolist() for e in embeddings]
 
 
 def embed_query(text: str) -> list[float]:
